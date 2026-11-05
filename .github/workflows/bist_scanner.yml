@@ -1,0 +1,67 @@
+name: BIST Quant Scanner
+
+on:
+  schedule:
+    # Hafta içi her gün (Pazartesi-Cuma) Saat 10:15 TSİ (UTC 07:15) -> Sabah Kırılım & Tavan Adayları
+    - cron: '16 7 * * 1-5'
+    # Hafta içi her gün (Pazartesi-Cuma) Saat 18:20 TSİ (UTC 15:20) -> Akşam Kapanış Sıkışmaları
+    - cron: '21 15 * * 1-5'
+
+  workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: 'Çalıştırılacak Tarama Modu'
+        required: true
+        default: 'morning_breakout'
+        type: choice
+        options:
+          - morning_breakout
+          - evening_squeeze
+
+jobs:
+  scan-bist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Depoyu Klonla (Checkout)
+        uses: actions/checkout@v4
+
+      - name: uv Kurulumu
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Python 3.11 Kurulumu (uv ile)
+        run: uv python install 3.11
+
+      - name: Sanal Ortam (bist) Önbellekleme (Cache)
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: bist
+          key: uv-venv-${{ runner.os }}-py3.11-${{ hashFiles('requirements.txt') }}
+
+      - name: 'bist' Sanal Ortamını Oluştur ve Paketleri Yükle (uv)
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: |
+          uv venv bist --python 3.11
+          uv pip install -r requirements.txt --python bist/bin/python
+
+      - name: Tarama Modunu Belirle ve Betiği 'bist' Ortamında Çalıştır
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            export SCAN_MODE="${{ github.event.inputs.scan_mode }}"
+          elif [ "${{ github.event.schedule }}" = "15 7 * * 1-5" ]; then
+            export SCAN_MODE="morning_breakout"
+          elif [ "${{ github.event.schedule }}" = "20 15 * * 1-5" ]; then
+            export SCAN_MODE="evening_squeeze"
+          else
+            export SCAN_MODE="morning_breakout"
+          fi
+
+          echo "Seçilen Tarama Modu: $SCAN_MODE"
+          ./bist/bin/python src/scanner.py "$SCAN_MODE"
