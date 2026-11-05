@@ -2,9 +2,9 @@ name: BIST Quant Scanner
 
 on:
   schedule:
-    # Hafta içi her gün (Pazartesi-Cuma) Saat 10:15 TSİ (UTC 07:15) -> Sabah Kırılım & Tavan Adayları
+    # Hafta içi her gün (Pazartesi-Cuma) Saat 10:16 TSİ (UTC 07:16) -> Sabah Kırılım & Tavan Adayları
     - cron: '16 7 * * 1-5'
-    # Hafta içi her gün (Pazartesi-Cuma) Saat 18:20 TSİ (UTC 15:20) -> Akşam Kapanış Sıkışmaları
+    # Hafta içi her gün (Pazartesi-Cuma) Saat 18:21 TSİ (UTC 15:21) -> Akşam Kapanış Sıkışmaları
     - cron: '21 15 * * 1-5'
 
   workflow_dispatch:
@@ -42,22 +42,22 @@ jobs:
           path: bist
           key: uv-venv-${{ runner.os }}-py3.11-${{ hashFiles('requirements.txt') }}
 
-      - name: 'bist' Sanal Ortamını Oluştur ve Paketleri Yükle (uv)
+      - name: Sanal Ortam Olustur ve Paketleri Yukle (uv)
         if: steps.cache-venv.outputs.cache-hit != 'true'
         run: |
           uv venv bist --python 3.11
           uv pip install -r requirements.txt --python bist/bin/python
 
-      - name: Tarama Modunu Belirle ve Betiği 'bist' Ortamında Çalıştır
+      - name: Tarama Modunu Belirle ve Betigi bist Ortaminda Calistir
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             export SCAN_MODE="${{ github.event.inputs.scan_mode }}"
-          elif [ "${{ github.event.schedule }}" = "15 7 * * 1-5" ]; then
+          elif [ "${{ github.event.schedule }}" = "16 7 * * 1-5" ]; then
             export SCAN_MODE="morning_breakout"
-          elif [ "${{ github.event.schedule }}" = "20 15 * * 1-5" ]; then
+          elif [ "${{ github.event.schedule }}" = "21 15 * * 1-5" ]; then
             export SCAN_MODE="evening_squeeze"
           else
             export SCAN_MODE="morning_breakout"
