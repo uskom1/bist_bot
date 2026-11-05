@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>BIST Quant Scanner — Telegram Mini App</title>
+
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            tg: {
+              bg: 'var(--tg-theme-bg-color, #0f172a)',
+              secondary: 'var(--tg-theme-secondary-bg-color, #1e293b)',
+              text: 'var(--tg-theme-text-color, #f8fafc)',
+              hint: 'var(--tg-theme-hint-color, #94a3b8)',
+              link: 'var(--tg-theme-link-color, #38bdf8)',
+              button: 'var(--tg-theme-button-color, #2563eb)',
+              buttonText: 'var(--tg-theme-button-text-color, #ffffff)',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    :root {
+      --tg-theme-bg-color: #0b1120;
+      --tg-theme-secondary-bg-color: #161f33;
+      --tg-theme-text-color: #f1f5f9;
+      --tg-theme-hint-color: #94a3b8;
+      --tg-theme-link-color: #38bdf8;
+      --tg-theme-button-color: #2563eb;
+      --tg-theme-button-text-color: #ffffff;
+    }
+
+    body {
+      background-color: var(--tg-theme-bg-color);
+      color: var(--tg-theme-text-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .tg-card {
+      background-color: var(--tg-theme-secondary-bg-color);
+    }
+
+    .mode-card-active {
+      border-color: var(--tg-theme-button-color) !important;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28);
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-10 antialiased">
+
+  <!-- Üst Başlık / Durum Çubuğu -->
+  <header class="sticky top-0 z-30 backdrop-blur-md bg-opacity-85 tg-card border-b border-white/10 px-4 py-3.5">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20 text-lg">
+          📈
+        </div>
+        <div>
+          <h1 class="text-base font-bold tracking-tight leading-tight">BIST Quant Scanner</h1>
+          <p id="userGreeting" class="text-xs opacity-70">Algoritmik Kırılım & Sıkışma Radarı</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div id="connectionBadge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+          <span id="connectionDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span id="connectionText">Hazır</span>
+        </div>
+        <button
+          type="button"
+          onclick="toggleSettingsPanel()"
+          title="GitHub & Bağlantı Ayarları"
+          class="w-8 h-8 rounded-xl tg-card border border-white/10 hover:border-white/25 flex items-center justify-center text-sm active:scale-95 transition"
+        >
+          ⚙️
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-md mx-auto px-4 pt-4 space-y-5">
+
+    <!-- AYARLAR PANELİ (GitHub Pages / Statik Barındırma veya Özel Backend İçin) -->
+    <section id="settingsPanel" class="hidden tg-card rounded-2xl p-4 border border-blue-500/30 space-y-3 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400">⚙️ GitHub & Sunucu Ayarları</h3>
+        <button type="button" onclick="toggleSettingsPanel()" class="text-xs opacity-60 hover:opacity-100">✕ Kapat</button>
+      </div>
+      <p class="text-[11px] opacity-75 leading-relaxed">
+        Mini App'i <b>GitHub Pages</b> gibi statik bir yerde barındırıyorsanız, GitHub Actions'ı doğrudan tetiklemek için <b>GitHub Fine-Grained Token</b> (Actions: Read & Write) girebilirsiniz. Bilgiler yalnızca kendi cihazınızda (<code>localStorage</code>) saklanır.
+      </p>
+
+      <div class="space-y-2 text-xs">
+        <div>
+          <label class="block text-[11px] opacity-70 mb-1">GitHub Personal Access Token (PAT)</label>
+          <input
+            type="password"
+            id="inpGithubToken"
+            placeholder="github_pat_11ABCDEF..."
+            class="w-full px-3 py-2 rounded-xl bg-black/30 border border-white/10 text-xs font-mono focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] opacity-70 mb-1">Repo Owner</label>
+            <input
+              type="text"
+              id="inpRepoOwner"
+              placeholder="uskom1"
+              class="w-full px-3 py-2 rounded-xl bg-black/30 border border-white/10 text-xs font-mono focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label class="block text-[11px] opacity-70 mb-1">Repo Adı</label>
+            <input
+              type="text"
+              id="inpRepoName"
+              placeholder="bist_bot"
+              class="w-full px-3 py-2 rounded-xl bg-black/30 border border-white/10 text-xs font-mono focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] opacity-70 mb-1">Opsiyonel FastAPI Backend URL (Boş bırakılabilir)</label>
+          <input
+            type="url"
+            id="inpBackendUrl"
+            placeholder="https://sizin-backend-adresiniz.onrender.com"
+            class="w-full px-3 py-2 rounded-xl bg-black/30 border border-white/10 text-xs font-mono focus:outline-none focus:border-blue-500"
+          />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onclick="saveSettings()"
+        class="w-full py-2.5 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-500 transition"
+      >
+        💾 Ayarları Cihaza Kaydet
+      </button>
+    </section>
+
+    <!-- 1. TARAMA MODU SEÇİMİ -->
+    <section class="space-y-2.5">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xs font-semibold uppercase tracking-wider opacity-70">1. Tarama Stratejisi Seçin</h2>
+        <span id="clockBadge" class="text-[11px] font-mono opacity-60">TSİ --:--</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <!-- Mod A: Sabah Kırılım -->
+        <button
+          type="button"
+          id="btnModeMorning"
+          onclick="selectScanMode('morning_breakout')"
+          class="tg-card mode-card-active text-left p-3.5 rounded-2xl border border-white/10 transition-all duration-200 relative overflow-hidden group"
+        >
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xl">🚀</span>
+            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
+              10:15 TSİ
+            </span>
+          </div>
+          <div class="font-bold text-sm leading-snug">Sabah Kırılım</div>
+          <div class="text-[11px] opacity-65 mt-0.5 leading-relaxed">
+            Pivot R1 kıran hacimli tavan adayları
+          </div>
+          <div class="mt-2 pt-2 border-t border-white/5 text-[10px] opacity-55 font-mono">
+            RVol &gt; 1.8x • RSI 55-72
+          </div>
+        </button>
+
+        <!-- Mod B: Akşam Sıkışma -->
+        <button
+          type="button"
+          id="btnModeEvening"
+          onclick="selectScanMode('evening_squeeze')"
+          class="tg-card text-left p-3.5 rounded-2xl border border-white/10 transition-all duration-200 relative overflow-hidden group"
+        >
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xl">🌙</span>
+            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/20">
+              18:20 TSİ
+            </span>
+          </div>
+          <div class="font-bold text-sm leading-snug">Akşam Sıkışma</div>
+          <div class="text-[11px] opacity-65 mt-0.5 leading-relaxed">
+            Zirvede kapatan yarına hazır hisseler
+          </div>
+          <div class="mt-2 pt-2 border-t border-white/5 text-[10px] opacity-55 font-mono">
+            Mum &ge; %75 • RSI 52-65
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <!-- 2. TETİKLEME BUTONU & OPSİYONLAR -->
+    <section class="tg-card rounded-2xl p-4 border border-white/10 space-y-3.5 shadow-lg">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-xs font-medium">Telegram Bildirimi Gönder</div>
+          <div class="text-[11px] opacity-60">Sonuçları bota/kanala da mesaj olarak ilet</div>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="chkNotifyTelegram" class="sr-only peer" checked />
+          <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+
+      <button
+        type="button"
+        id="btnTriggerScan"
+        onclick="triggerScanNow()"
+        class="w-full py-3.5 px-5 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2"
+      >
+        <span id="btnTriggerIcon">🚀</span>
+        <span id="btnTriggerText">Taramayı Şimdi Başlat</span>
+      </button>
+
+      <!-- Canlı Durum / Geri Bildirim Kutusu -->
+      <div id="statusAlert" class="hidden rounded-xl p-3 text-xs border transition-all"></div>
+    </section>
+
+    <!-- 3. ÖNE ÇIKAN SEKTÖRLER BANDI -->
+    <section id="sectorSection" class="hidden space-y-2">
+      <h2 class="text-xs font-semibold uppercase tracking-wider opacity-70">🔥 Öne Çıkan Sektörler</h2>
+      <div id="sectorContainer" class="flex flex-wrap gap-2"></div>
+    </section>
+
+    <!-- 4. SON TARANAN HİSSELER (KART LİSTESİ) -->
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xs font-semibold uppercase tracking-wider opacity-70">📊 Taranan Hisse Özeti</h2>
+          <p id="lastUpdatedText" class="text-[11px] opacity-55 mt-0.5">Hazır</p>
+        </div>
+        <button
+          type="button"
+          onclick="fetchLatestResults(true)"
+          class="text-xs px-3 py-1.5 rounded-lg tg-card border border-white/10 hover:border-white/20 active:scale-95 transition flex items-center gap-1"
+        >
+          <span>🔄</span>
+          <span>Yenile</span>
+        </button>
+      </div>
+
+      <!-- Yükleniyor İskeleti (Skeleton) -->
+      <div id="loadingSkeleton" class="hidden space-y-2.5">
+        <div class="tg-card h-24 rounded-2xl animate-pulse border border-white/5"></div>
+        <div class="tg-card h-24 rounded-2xl animate-pulse border border-white/5"></div>
+      </div>
+
+      <!-- Hisse Kartları Konteyneri -->
+      <div id="stocksContainer" class="space-y-2.5"></div>
+    </section>
+
+    <!-- 5. SON GITHUB ACTIONS İŞ AKIŞLARI -->
+    <section class="space-y-2 pt-2">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xs font-semibold uppercase tracking-wider opacity-70">⚙️ Son GitHub Actions Çalışmaları</h2>
+        <button
+          type="button"
+          onclick="fetchWorkflowRuns()"
+          class="text-[11px] opacity-70 hover:opacity-100 underline"
+        >
+          Durumu Sorgula
+        </button>
+      </div>
+      <div id="workflowRunsContainer" class="tg-card rounded-2xl p-3 border border-white/10 text-xs space-y-2">
+        <div class="opacity-60 text-center py-1">İş akışı geçmişi yükleniyor...</div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // 1. DURUM DEĞİŞKENLERİ VE AYARLAR (LOCALSTORAGE DESTEKLİ)
+    // =========================================================================
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    let currentScanMode = 'morning_breakout';
+    let isScanning = false;
+    let backendAvailable = null; // true: FastAPI aktif, false: Statik / GitHub Pages modu
+
+    function getSettings() {
+      return {
+        githubToken: (localStorage.getItem('bist_gh_token') || '').trim(),
+        repoOwner: (localStorage.getItem('bist_repo_owner') || 'uskom1').trim(),
+        repoName: (localStorage.getItem('bist_repo_name') || 'bist_bot').trim(),
+        backendUrl: (localStorage.getItem('bist_backend_url') || '').trim().replace(/\/+$/, ''),
+        workflowId: 'bist_scanner.yml',
+        gitRef: 'main'
+      };
+    }
+
+    function loadSettingsToInputs() {
+      const s = getSettings();
+      document.getElementById('inpGithubToken').value = s.githubToken;
+      document.getElementById('inpRepoOwner').value = s.repoOwner;
+      document.getElementById('inpRepoName').value = s.repoName;
+      document.getElementById('inpBackendUrl').value = s.backendUrl;
+    }
+
+    function toggleSettingsPanel() {
+      const panel = document.getElementById('settingsPanel');
+      panel.classList.toggle('hidden');
+      if (!panel.classList.contains('hidden')) {
+        loadSettingsToInputs();
+      }
+    }
+
+    function saveSettings() {
+      localStorage.setItem('bist_gh_token', document.getElementById('inpGithubToken').value.trim());
+      localStorage.setItem('bist_repo_owner', document.getElementById('inpRepoOwner').value.trim() || 'uskom1');
+      localStorage.setItem('bist_repo_name', document.getElementById('inpRepoName').value.trim() || 'bist_bot');
+      localStorage.setItem('bist_backend_url', document.getElementById('inpBackendUrl').value.trim());
+
+      hapticFeedback('success');
+      document.getElementById('settingsPanel').classList.add('hidden');
+      showStatusAlert('success', '💾 Ayarlar Kaydedildi', 'GitHub bağlantısı ve depo ayarlarınız güncellendi.');
+      checkEnvironmentAndInit();
+    }
+
+    // Güvenli JSON okuma yardımcısı ("Unexpected end of JSON input" hatasını tamamen önler)
+    async function safeFetchJson(url, options = {}) {
+      const resp = await fetch(url, options);
+      const rawText = await resp.text();
+      if (!rawText || !rawText.trim()) {
+        return { ok: resp.ok, status: resp.status, data: null, empty: true };
+      }
+      try {
+        const parsed = JSON.parse(rawText);
+        return { ok: resp.ok, status: resp.status, data: parsed, empty: false };
+      } catch (e) {
+        return { ok: false, status: resp.status, data: null, rawText: rawText.slice(0, 200) };
+      }
+    }
+
+    function getApiUrl(path) {
+      const { backendUrl } = getSettings();
+      return backendUrl ? `${backendUrl}${path}` : path;
+    }
+
+    // =========================================================================
+    // 2. TELEGRAM WEBAPP BAŞLATMA VE ORTAM TESPİTİ
+    // =========================================================================
+    function initTelegramWebApp() {
+      if (!tg) return;
+      tg.ready();
+      tg.expand();
+
+      const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (user && user.first_name) {
+        document.getElementById('userGreeting').textContent =
+          `Hoş geldin, ${user.first_name} • BIST Radar`;
+      }
+
+      if (tg.colorScheme === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        document.documentElement.classList.add('dark');
+      }
+    }
+
+    function hapticFeedback(type = 'light') {
+      if (tg && tg.HapticFeedback) {
+        if (type === 'success' || type === 'error' || type === 'warning') {
+          tg.HapticFeedback.notificationOccurred(type);
+        } else {
+          tg.HapticFeedback.impactOccurred(type);
+        }
+      }
+    }
+
+    function autoSelectModeByTime() {
+      const now = new Date();
+      const utcHours = now.getUTCHours();
+      const trHours = (utcHours + 3) % 24;
+      const trMinutes = String(now.getUTCMinutes()).padStart(2, '0');
+      document.getElementById('clockBadge').textContent = `TSİ ${String(trHours).padStart(2, '0')}:${trMinutes}`;
+
+      if (trHours >= 14) {
+        selectScanMode('evening_squeeze', false);
+      } else {
+        selectScanMode('morning_breakout', false);
+      }
+    }
+
+    function selectScanMode(mode, fetchResults = true) {
+      currentScanMode = mode;
+      hapticFeedback('light');
+
+      const btnMorning = document.getElementById('btnModeMorning');
+      const btnEvening = document.getElementById('btnModeEvening');
+
+      if (mode === 'morning_breakout') {
+        btnMorning.classList.add('mode-card-active');
+        btnEvening.classList.remove('mode-card-active');
+      } else {
+        btnEvening.classList.add('mode-card-active');
+        btnMorning.classList.remove('mode-card-active');
+      }
+
+      if (fetchResults && backendAvailable) {
+        fetchLatestResults(false);
+      }
+    }
+
+    function showStatusAlert(type, title, message) {
+      const box = document.getElementById('statusAlert');
+      box.classList.remove(
+        'hidden',
+        'bg-emerald-500/15', 'border-emerald-500/30', 'text-emerald-300',
+        'bg-amber-500/15', 'border-amber-500/30', 'text-amber-300',
+        'bg-rose-500/15', 'border-rose-500/30', 'text-rose-300',
+        'bg-blue-500/15', 'border-blue-500/30', 'text-blue-300'
+      );
+
+      if (type === 'success') {
+        box.classList.add('bg-emerald-500/15', 'border-emerald-500/30', 'text-emerald-300');
+      } else if (type === 'warning') {
+        box.classList.add('bg-amber-500/15', 'border-amber-500/30', 'text-amber-300');
+      } else if (type === 'error') {
+        box.classList.add('bg-rose-500/15', 'border-rose-500/30', 'text-rose-300');
+      } else {
+        box.classList.add('bg-blue-500/15', 'border-blue-500/30', 'text-blue-300');
+      }
+
+      box.innerHTML = `
+        <div class="font-bold mb-0.5">${title}</div>
+        <div class="opacity-90 leading-relaxed">${message}</div>
+      `;
+    }
+
+    // =========================================================================
+    // 3. DOĞRUDAN GITHUB API TETİKLEME (STATİK / GITHUB PAGES MODU İÇİN)
+    // =========================================================================
+    async function triggerGitHubDirectly(scanMode) {
+      const { githubToken, repoOwner, repoName, workflowId, gitRef } = getSettings();
+
+      if (!githubToken) {
+        document.getElementById('settingsPanel').classList.remove('hidden');
+        loadSettingsToInputs();
+        throw new Error(
+          'Mini App şu an Statik (GitHub Pages) modunda çalışıyor. GitHub Actions\'ı tetiklemek için yukarıdaki ⚙️ Ayarlar kutusuna GitHub Token (PAT) girip kaydedin.'
+        );
+      }
+
+      const url = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/${workflowId}/dispatches`;
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'Authorization': `Bearer ${githubToken}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ref: gitRef,
+          inputs: { scan_mode: scanMode }
+        })
+      });
+
+      if (resp.status === 204) {
+        return {
+          dispatched: true,
+          workflow: workflowId,
+          repo: `${repoOwner}/${repoName}`
+        };
+      }
+
+      const errText = await resp.text();
+      throw new Error(`GitHub API Hatası (HTTP ${resp.status}): ${errText.slice(0, 180)}`);
+    }
+
+    // =========================================================================
+    // 4. TARAMAYI BAŞLAT (HEM FASTAPI BACKEND HEM STATİK GITHUB PAGES DESTEKLİ)
+    // =========================================================================
+    async function triggerScanNow() {
+      if (isScanning) return;
+      isScanning = true;
+      hapticFeedback('medium');
+
+      const btn = document.getElementById('btnTriggerScan');
+      const icon = document.getElementById('btnTriggerIcon');
+      const text = document.getElementById('btnTriggerText');
+      const notifyTg = document.getElementById('chkNotifyTelegram').checked;
+
+      btn.disabled = true;
+      btn.classList.add('opacity-75', 'cursor-not-allowed');
+      icon.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>`;
+      text.textContent = 'Tetikleniyor...';
+
+      const modeLabel = currentScanMode === 'morning_breakout' ? 'Sabah Kırılım' : 'Akşam Sıkışma';
+      showStatusAlert('info', '⏳ İşlem Başlatıldı', `<b>${modeLabel}</b> taraması tetikleniyor...`);
+
+      try {
+        if (backendAvailable) {
+          // FastAPI Backend üzerinden tetikle
+          const headers = { 'Content-Type': 'application/json' };
+          if (tg && tg.initData) {
+            headers['X-Telegram-Init-Data'] = tg.initData;
+          }
+
+          const res = await safeFetchJson(getApiUrl('/api/trigger-scan'), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              scan_mode: currentScanMode,
+              run_direct_preview: true,
+              notify_telegram: notifyTg
+            })
+          });
+
+          if (!res.ok || !res.data) {
+            throw new Error((res.data && res.data.detail) || 'Backend yanıt vermedi.');
+          }
+
+          const data = res.data;
+          if (data.scan_results) {
+            renderScanResults(data.scan_results);
+          }
+
+          if (data.github_dispatch && data.github_dispatch.dispatched) {
+            hapticFeedback('success');
+            showStatusAlert(
+              'success',
+              '✅ GitHub Actions & Canlı Tarama Başarılı!',
+              `İş akışı (<code>${data.github_dispatch.workflow}</code>) kuyruğa alındı. Sonuçlar Telegram'a gönderilecek.`
+            );
+            setTimeout(fetchWorkflowRuns, 2500);
+          } else {
+            hapticFeedback('warning');
+            showStatusAlert(
+              'warning',
+              '⚡ Canlı Tarama Tamamlandı',
+              `Hisse sonuçları aşağıda listelendi.`
+            );
+          }
+        } else {
+          // Statik Mod (GitHub Pages): Doğrudan GitHub REST API'sini tetikle
+          const ghRes = await triggerGitHubDirectly(currentScanMode);
+          hapticFeedback('success');
+          showStatusAlert(
+            'success',
+            '✅ GitHub Actions İş Akışı Başlatıldı!',
+            `<b>${ghRes.repo}</b> deposunda <code>${ghRes.workflow}</code> (${modeLabel}) başarıyla tetiklendi! Yaklaşık 20-30 saniye içinde sonuçlar Telegram botunuza gelecektir.`
+          );
+          setTimeout(fetchWorkflowRuns, 3000);
+        }
+      } catch (err) {
+        hapticFeedback('error');
+        showStatusAlert('error', '❌ Tetikleme Hatası', err.message || 'Beklenmeyen bir hata oluştu.');
+      } finally {
+        isScanning = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-75', 'cursor-not-allowed');
+        icon.textContent = '🚀';
+        text.textContent = 'Taramayı Şimdi Başlat';
+      }
+    }
+
+    // =========================================================================
+    // 5. HİSSE SONUÇLARI VE GITHUB ACTIONS DURUMU
+    // =========================================================================
+    async function fetchLatestResults(forceRefresh = false) {
+      const skeleton = document.getElementById('loadingSkeleton');
+      const container = document.getElementById('stocksContainer');
+
+      if (!backendAvailable) {
+        document.getElementById('lastUpdatedText').textContent = 'GitHub Actions / Telegram Modu';
+        container.innerHTML = `
+          <div class="tg-card rounded-2xl p-4 border border-white/10 text-xs space-y-1.5">
+            <div class="font-bold text-blue-400">ℹ️ Bulut Tetikleyici Modu (GitHub Pages)</div>
+            <p class="opacity-75 leading-relaxed">
+              Yukarıdaki <b>"🚀 Taramayı Şimdi Başlat"</b> butonuna bastığınızda GitHub Actions üzerinde BIST taraması çalışır ve hisse kartları doğrudan <b>Telegram</b> sohbetinize düşer.
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      skeleton.classList.remove('hidden');
+      container.innerHTML = '';
+
+      try {
+        const res = await safeFetchJson(getApiUrl(`/api/results?scan_mode=${currentScanMode}&refresh=${forceRefresh}`));
+        if (!res.ok || !res.data) {
+          throw new Error((res.data && res.data.detail) || 'Backend sunucusuna ulaşılamadı.');
+        }
+        renderScanResults(res.data);
+      } catch (err) {
+        document.getElementById('lastUpdatedText').textContent = 'Sunucu bekleniyor';
+        container.innerHTML = `
+          <div class="tg-card rounded-2xl p-4 text-center border border-amber-500/20 text-xs text-amber-300">
+            ⚠️ Canlı önizleme için FastAPI backend gerekiyor. GitHub Actions üzerinden Telegram bildirimi almak için yukarıdan <b>Taramayı Şimdi Başlat</b> butonunu kullanabilirsiniz.
+          </div>
+        `;
+      } finally {
+        skeleton.classList.add('hidden');
+      }
+    }
+
+    function renderScanResults(data) {
+      const lastUpdatedEl = document.getElementById('lastUpdatedText');
+      const sectorSection = document.getElementById('sectorSection');
+      const sectorContainer = document.getElementById('sectorContainer');
+      const stocksContainer = document.getElementById('stocksContainer');
+
+      const modeTitle = data.scan_mode === 'morning_breakout' ? 'Sabah Kırılım' : 'Akşam Sıkışma';
+      lastUpdatedEl.textContent = `${modeTitle} • Son Güncelleme: ${data.last_updated || '--'}`;
+
+      if (data.top_sectors && data.top_sectors.length > 0) {
+        sectorSection.classList.remove('hidden');
+        sectorContainer.innerHTML = data.top_sectors.map((s, idx) => `
+          <div class="tg-card px-3 py-1.5 rounded-xl border border-white/10 text-xs flex items-center gap-1.5">
+            <span>${idx === 0 ? '🥇' : '🥈'}</span>
+            <span class="font-semibold">${s.sector}</span>
+            <span class="text-[11px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-mono">${s.count} Hisse</span>
+          </div>
+        `).join('');
+      } else {
+        sectorSection.classList.add('hidden');
+      }
+
+      if (!data.stocks || data.stocks.length === 0) {
+        stocksContainer.innerHTML = `
+          <div class="tg-card rounded-2xl p-6 text-center border border-white/10 space-y-1.5">
+            <div class="text-2xl">🔍</div>
+            <div class="text-sm font-bold">Kriterlere Uyan Hisse Bulunamadı</div>
+            <div class="text-xs opacity-60">Seans dışı saatte olabilirsiniz veya mevcut piyasa koşullarında filtreleri geçen hisse yok.</div>
+          </div>
+        `;
+        return;
+      }
+
+      stocksContainer.innerHTML = data.stocks.map((stock) => {
+        const isPositive = stock.change >= 0;
+        const changeBadgeClass = isPositive
+          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+          : 'bg-rose-500/15 text-rose-400 border-rose-500/30';
+
+        const closePosBadge = stock.close_position_pct !== null && stock.close_position_pct !== undefined
+          ? `<span class="px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 text-[10px] font-mono">🕯 Mum Gücü: %${stock.close_position_pct}</span>`
+          : '';
+
+        return `
+          <div class="tg-card rounded-2xl p-3.5 border border-white/10 hover:border-white/20 transition space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <span class="w-6 h-6 rounded-lg bg-blue-500/15 text-blue-400 text-xs font-bold flex items-center justify-center font-mono">
+                  ${stock.rank}
+                </span>
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-extrabold text-sm tracking-wide">${stock.symbol}</span>
+                    <span class="text-[11px] opacity-60">• ${stock.sector}</span>
+                  </div>
+                  <div class="text-[11px] opacity-75 mt-0.5">${stock.risk_group}</div>
+                </div>
+              </div>
+
+              <div class="text-right">
+                <div class="font-bold text-sm font-mono">${stock.close.toFixed(2)} ₺</div>
+                <span class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold border ${changeBadgeClass}">
+                  ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-[11px]">
+              <div class="bg-black/20 rounded-lg p-1.5 text-center">
+                <div class="opacity-55 text-[10px]">Rel. Hacim</div>
+                <div class="font-bold font-mono text-amber-300">${stock.relative_volume.toFixed(2)}x</div>
+              </div>
+              <div class="bg-black/20 rounded-lg p-1.5 text-center">
+                <div class="opacity-55 text-[10px]">RSI (14)</div>
+                <div class="font-bold font-mono">${stock.rsi.toFixed(1)}</div>
+              </div>
+              <div class="bg-black/20 rounded-lg p-1.5 text-center">
+                <div class="opacity-55 text-[10px]">Günlük Ciro</div>
+                <div class="font-bold font-mono text-sky-300">${stock.turnover_formatted}</div>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="px-2 py-0.5 rounded-md bg-white/5 text-[10px] font-mono opacity-80">
+                  🎯 Pivot R1: ${stock.pivot_r1 ? stock.pivot_r1.toFixed(2) + ' ₺' : 'N/A'}
+                </span>
+                ${closePosBadge}
+              </div>
+
+              <a
+                href="${stock.tradingview_url}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-[11px] font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1"
+              >
+                <span>Grafik</span>
+                <span>↗</span>
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function fetchWorkflowRuns() {
+      const container = document.getElementById('workflowRunsContainer');
+      const { githubToken, repoOwner, repoName, workflowId } = getSettings();
+
+      try {
+        let runs = [];
+        if (backendAvailable) {
+          const res = await safeFetchJson(getApiUrl('/api/workflow-runs'));
+          if (res.ok && res.data && res.data.runs) {
+            runs = res.data.runs;
+          }
+        } else {
+          // Doğrudan GitHub API üzerinden son çalışmaları çek
+          const ghUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/${workflowId}/runs?per_page=5`;
+          const headers = { 'Accept': 'application/vnd.github+json' };
+          if (githubToken) {
+            headers['Authorization'] = `Bearer ${githubToken}`;
+          }
+          const res = await safeFetchJson(ghUrl, { headers });
+          if (res.ok && res.data && res.data.workflow_runs) {
+            runs = res.data.workflow_runs.slice(0, 5);
+          }
+        }
+
+        if (!runs || runs.length === 0) {
+          container.innerHTML = `
+            <div class="opacity-60 text-center py-1">
+              Henüz çalışma kaydı yok (veya repo gizliyse ⚙️ Ayarlar'dan GitHub Token girin).
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = runs.map((run) => {
+          let badge = `<span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300">⏳ ${run.status}</span>`;
+          if (run.status === 'completed') {
+            badge = run.conclusion === 'success'
+              ? `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300">✅ Başarılı</span>`
+              : `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-300">❌ ${run.conclusion || 'Hata'}</span>`;
+          }
+          const dateStr = run.created_at ? new Date(run.created_at).toLocaleString('tr-TR') : '';
+          return `
+            <div class="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
+              <div>
+                <span class="font-mono font-semibold">#${run.id.toString().slice(-5)}</span>
+                <span class="opacity-60 ml-1.5">${run.event}</span>
+                <div class="text-[10px] opacity-50">${dateStr}</div>
+              </div>
+              <div class="flex items-center gap-2">
+                ${badge}
+                <a href="${run.html_url}" target="_blank" class="text-blue-400 text-[11px]">Detay ↗</a>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        container.innerHTML = `<div class="opacity-60 text-center py-1">GitHub Actions durumu alınamadı.</div>`;
+      }
+    }
+
+    async function checkEnvironmentAndInit() {
+      const health = await safeFetchJson(getApiUrl('/api/health'));
+      backendAvailable = Boolean(health.ok && health.data && health.data.status === 'ok');
+
+      const badgeText = document.getElementById('connectionText');
+      if (backendAvailable) {
+        badgeText.textContent = 'API Aktif';
+      } else {
+        badgeText.textContent = 'Bulut Modu';
+      }
+
+      fetchLatestResults(false);
+      fetchWorkflowRuns();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initTelegramWebApp();
+      autoSelectModeByTime();
+      checkEnvironmentAndInit();
+    });
+  </script>
+</body>
+</html>
