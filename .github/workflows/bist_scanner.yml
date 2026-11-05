@@ -1,6 +1,6 @@
 name: BIST Quant Scanner
 
-on:
+'on':
   schedule:
     # Hafta içi her gün (Pazartesi-Cuma) Saat 10:16 TSİ (UTC 07:16) -> Sabah Kırılım & Tavan Adayları
     - cron: '16 7 * * 1-5'
@@ -40,10 +40,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: bist
-          key: uv-venv-${{ runner.os }}-py3.11-${{ hashFiles('requirements.txt') }}
+          key: "uv-venv-${{ runner.os }}-py3.11-${{ hashFiles('requirements.txt') }}"
 
       - name: Sanal Ortam Olustur ve Paketleri Yukle (uv)
-        if: steps.cache-venv.outputs.cache-hit != 'true'
+        if: ${{ steps.cache-venv.outputs.cache-hit != 'true' }}
         run: |
           uv venv bist --python 3.11
           uv pip install -r requirements.txt --python bist/bin/python
