@@ -1,6 +1,6 @@
-# 📈 BIST Quant Scanner & Telegram Bildirim Botu
+# 📈 BIST Quant Scanner & Telegram Mini App (TMA)
 
-Borsa İstanbul (**BIST**) hisselerinde sabah açılış kırılımlarını (**tavan adaylarını**) ve akşam kapanış sıkışmalarını (**ertesi gün hazırlık hisselerini**) `tradingview-screener` üzerinden tarayıp sonuçları sektör kümeleme analiziyle birlikte **Telegram**'a gönderen, hem **GitHub Actions** hem de lokalde **`uv` veya `pyenv` (`bist` sanal ortamı)** ile izole çalışan uçtan uca bir kantitatif tarama projesidir.
+Borsa İstanbul (**BIST**) hisselerinde sabah açılış kırılımlarını (**tavan adaylarını**) ve akşam kapanış sıkışmalarını (**ertesi gün hazırlık hisselerini**) `tradingview-screener` üzerinden tarayıp günlük işlem cirosuna göre risk gruplarına ayıran, sonuçları **Telegram**'a gönderen ve **Telegram Mini App (WebApp)** arayüzünden tek tuşla yönetilebilen uçtan uca kantitatif tarama projesidir.
 
 ---
 
@@ -11,133 +11,108 @@ Borsa İstanbul (**BIST**) hisselerinde sabah açılış kırılımlarını (**t
 ├── .github/
 │   └── workflows/
 │       └── bist_scanner.yml   # İzole 'bist' (uv) önbellekli GitHub Actions otomasyonu
+├── backend/
+│   └── main.py                # FastAPI sunucusu (GitHub Actions tetikleyici + Canlı API)
+├── frontend/
+│   └── index.html             # Telegram WebApp SDK & Tailwind CSS mobil uyumlu Mini App arayüzü
 ├── src/
-│   └── scanner.py             # Sabah ve akşam BIST tarama & Telegram bildirim motoru
-├── requirements.txt           # Python bağımlılıkları
+│   └── scanner.py             # Sabah ve akşam BIST tarama, ciro/risk analizi & Telegram motoru
+├── .env.example               # Örnek ortam değişkenleri şablonu
+├── requirements.txt           # Python bağımlılıkları (FastAPI, Uvicorn, TradingView, Pandas)
 ├── run_local.sh               # uv / pyenv ile 'bist' sanal ortamını kurup çalıştıran betik
-└── README.md                  # Kurulum ve kullanım kılavuzu
+└── README.md                  # Kurulum ve Telegram Mini App (BotFather) rehberi
 ```
 
 ---
 
-## 🧠 Tarama Stratejileri ve Modlar
+## 🧠 Tarama Stratejileri ve Risk Sınıflandırması
 
 ### 1. Sabah Kırılım & Tavan Adayları (`morning_breakout` - 10:15 TSİ)
-Sabah seans açıldıktan sonra güçlü hacim ve momentumla **Klasik Pivot R1** direncini kıran hisseleri tespit eder:
-- **Günlük Değişim (`change`):** `%1.5` ile `%6.0` arasında (henüz tavana kilitlememiş ama güçlü alım gelmiş).
-- **Göreceli Hacim (`relative_volume_10d_calc`):** `> 1.8` (10 günlük ortalama hacmin en az 1.8 katı).
-- **RSI (14):** `55` ile `72` arasında (momentumun "Sweet Spot" bölgesi).
-- **Trend Filtresi:** `close > EMA20` ve `close > EMA50`.
-- **Direnç Kırılımı:** `close >= Pivot.M.Classic.R1`.
-- **Sıralama:** Göreceli hacme göre azalan, maksimum **15 hisse**.
+- **Günlük Değişim (`change`):** `%1.5` ile `%6.0` arasında.
+- **Göreceli Hacim (`relative_volume_10d_calc`):** `> 1.8x`.
+- **RSI (14):** `55` ile `72` arasında.
+- **Trend & Direnç:** `close > EMA20`, `close > EMA50` ve `close >= Pivot.M.Classic.R1`.
 
 ### 2. Akşam Kapanış Sıkışmaları (`evening_squeeze` - 18:20 TSİ)
-Günü en yükseğine yakın (alıcılı Marubozu mumu ile) kapatan ve ertesi sabah kırılıma hazır hisseleri tespit eder:
 - **Günlük Değişim (`change`):** `%0.5` ile `%4.5` arasında.
 - **RSI (14):** `52` ile `65` arasında.
-- **Trend Filtresi:** `close > EMA9` ve `close > EMA20`.
-- **Teknik Derecelendirme (`Recommend.All`):** `> 0.1` (*Al* veya *Güçlü Al*).
-- **Mum Gücü (Pandas Filtresi):** `(close - low) / (high - low) >= 0.75` (günün en yüksek seviyesine yakın kapanış, `high != low` korumalı).
-- **Sıralama:** Göreceli hacme göre azalan, maksimum **15 hisse**.
+- **Trend & Teknik:** `close > EMA9`, `close > EMA20` ve `Recommend.All > 0.1`.
+- **Mum Gücü (Marubozu):** `(close - low) / (high - low) >= 0.75` (`high != low` korumalı).
+
+### 3. Otomatik Ciro & Risk Grubu Sınıflandırması (`classify_risk_group`)
+- **Günlük Ciro > 500M TL:** `🛡️ Düşük Risk (Blue-Chip)`
+- **Günlük Ciro 100M - 500M TL:** `⚖️ Orta Risk (Mid-Cap)`
+- **Günlük Ciro < 100M TL:** `⚡ Yüksek Risk (Sığ/Tavan Adayı)`
 
 ---
 
-## 🤖 Telegram Bot Kurulumu
+## 📱 Telegram Mini App (TMA) Kurulumu ve Çalıştırılması
 
-1. Telegram'da [@BotFather](https://t.me/BotFather) hesabına gidin ve `/newbot` komutuyla yeni bir bot oluşturun.
-2. BotFather'ın verdiği **HTTP API Token** değerini kopyalayın (`TELEGRAM_BOT_TOKEN`).
-3. Botunuza Telegram üzerinden `/start` mesajı gönderin (veya botu bir gruba/kanala ekleyip yönetici yapın).
-4. `TELEGRAM_CHAT_ID` değerinizi öğrenmek için tarayıcınızda şu adresi açın:
-   ```text
-   https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getUpdates
-   ```
-   JSON çıktısındaki `"chat":{"id": ...}` alanı sizin `TELEGRAM_CHAT_ID` değerinizdir.
+### 1. `.env` Dosyasını Hazırlayın
+`.env.example` dosyasını `.env` olarak kopyalayın ve değerlerinizi girin:
 
----
-
-## ☁️ GitHub Actions Kurulumu (Otomatik Çalıştırma)
-
-Proje, hafta içi her gün Türkiye saatiyle (**TSİ / UTC+3**) **10:15** ve **18:20**'de GitHub Actions üzerinde **`uv`** ile oluşturulan **`bist`** sanal ortamında otomatik çalışır.
-
-### 1. GitHub Secrets Tanımlama
-GitHub deponuzda sırasıyla **Settings** -> **Secrets and variables** -> **Actions** menüsüne gidin ve **New repository secret** butonuna tıklayarak aşağıdaki iki gizli değişkeni ekleyin:
-
-| Secret Adı | Açıklama | Örnek Değer |
-| :--- | :--- | :--- |
-| `TELEGRAM_BOT_TOKEN` | BotFather'dan alınan Telegram Bot API anahtarı | `1234567890:AAHxyz...` |
-| `TELEGRAM_CHAT_ID` | Bildirimlerin gönderileceği kullanıcı, grup veya kanal ID'si | `987654321` veya `-100123456789` |
-
-### 2. Manuel Tetikleme (`workflow_dispatch`)
-- GitHub deponuzda **Actions** sekmesine tıklayın.
-- Sol menüden **BIST Quant Scanner** iş akışını seçin.
-- Sağ taraftaki **Run workflow** açılır menüsünden `morning_breakout` veya `evening_squeeze` modunu seçip **Run workflow** butonuna basın.
-
----
-
-## 💻 Lokal Ortamda Kurulum ve Çalıştırma (`bist` Sanal Ortamı)
-
-### 1. `.env` Dosyasını Oluşturun
-Proje kök dizininde `.env` adında bir dosya oluşturun ve bilgilerinizi girin:
+```bash
+cp .env.example .env
+```
 
 ```env
-TELEGRAM_BOT_TOKEN=1234567890:AAHxyz_sizin_bot_tokeniniz
+TELEGRAM_BOT_TOKEN=1234567890:AAHxyz_sizin_telegram_bot_tokeniniz
 TELEGRAM_CHAT_ID=987654321
-SCAN_MODE=morning_breakout
+GITHUB_TOKEN=github_pat_11ABCDEFG_sizin_github_tokeniniz
+REPO_OWNER=uskom1
+REPO_NAME=bist_bot
+WORKFLOW_ID=bist_scanner.yml
+GITHUB_REF=main
+PORT=8000
 ```
 
-### 2. Otomatik Betik ile Çalıştırma (`run_local.sh`)
-`run_local.sh` betiği sisteminizde `uv` veya `pyenv` olup olmadığını kontrol eder, **`bist`** adında sanal ortamı oluşturur, bağımlılıkları kurar ve taramayı başlatır:
+> **GitHub Token Nasıl Alınır?**
+> GitHub'da **Settings** -> **Developer settings** -> **Personal access tokens** -> **Fine-grained tokens** -> **Generate new token** adımlarını izleyin. `bist_bot` deponuzu seçin ve **Repository permissions** altından **Actions: Read and write** yetkisi verin.
+
+### 2. FastAPI Backend ve Mini App Sunucusunu Başlatın
+`bist` sanal ortamınızı aktif edip paketleri yükledikten sonra sunucuyu başlatın:
 
 ```bash
-chmod +x run_local.sh
+# Windows PowerShell:
+.\bist\Scripts\Activate.ps1
+# Linux / macOS / WSL2:
+# source bist/bin/activate
 
-# Sabah kırılım modunda çalıştır:
-./run_local.sh morning_breakout
+uv pip install -r requirements.txt
 
-# Akşam kapanış sıkışması modunda çalıştır:
-./run_local.sh evening_squeeze
-
-# Telegram'a mesaj atmadan sadece terminalde test et (--dry-run):
-./run_local.sh morning_breakout --dry-run
+# Sunucuyu başlat (http://localhost:8000)
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+Tarayıcınızdan `http://localhost:8000` adresine giderek Mini App arayüzünü anında test edebilirsiniz.
 
 ---
 
-### 3. Manuel Kurulum Seçenekleri (`uv` veya `pyenv`)
+### 3. @BotFather Üzerinden Telegram Mini App Tanımlama
 
-#### Seçenek A: `uv` ile `bist` Sanal Ortamı (Önerilen - Çok Hızlı)
-```bash
-# 1. 'bist' adında sanal ortam oluştur
-uv venv bist --python 3.11
+Telegram Mini App'lerin Telegram içinden açılabilmesi için **HTTPS** adresine ihtiyacı vardır.
+- **Lokal Test İçin:** `ngrok http 8000` veya `cloudflared tunnel --url http://localhost:8000` komutuyla geçici bir `https://....ngrok-free.app` veya `https://....trycloudflare.com` adresi alın.
+- **Kalıcı Dağıtım (Production) İçin:** Projeyi Render, Railway, Fly.io veya kendi VPS sunucunuza deploy edip HTTPS adresinizi alın.
 
-# 2. Sanal ortamı aktif et
-# Linux / macOS / WSL2:
-source bist/bin/activate
-# Windows (PowerShell):
-.\bist\Scripts\Activate.ps1
+Ardından Telegram'da [@BotFather](https://t.me/BotFather) ile şu adımları uygulayın:
 
-# 3. Paketleri 'bist' ortamına yükle
-uv pip install -r requirements.txt
+1. **Menu Button (Sohbet Altındaki Mini App Butonu) Ekleme:**
+   - `@BotFather`'a `/mybots` yazın ve botunuzu seçin.
+   - **Bot Settings** -> **Menu Button** -> **Configure menu button** seçeneğine tıklayın.
+   - BotFather sizden URL isteyecektir: HTTPS adresinizi (örn. `https://bist-app.onrender.com`) gönderin.
+   - Buton başlığı olarak `📈 BIST Radar` yazın. Artık bot sohbet ekranının sol altında doğrudan Mini App açma butonu belirecektir!
 
-# 4. Tarayıcıyı çalıştır
-python src/scanner.py morning_breakout
-python src/scanner.py evening_squeeze --dry-run
-```
+2. **Doğrudan Mini App Linki (`/newapp`) Oluşturma (Opsiyonel):**
+   - `@BotFather`'a `/newapp` komutunu gönderin ve botunuzu seçin.
+   - Uygulama başlığı, açıklaması ve bir görsel yükledikten sonra **Web App URL** kısmına HTTPS adresinizi girin.
+   - Kısa ad (short name) olarak `bist_scanner` belirleyin. Böylece `https://t.me/BotAdiniz/bist_scanner` linkiyle her yerden tek tıkla açılabilir.
 
-#### Seçenek B: `pyenv` (`pyenv-virtualenv`) ile `bist` Sanal Ortamı
-```bash
-# 1. Python 3.11 kur (eğer kurulu değilse) ve 'bist' ortamını oluştur
-pyenv install -s 3.11.9
-pyenv virtualenv 3.11.9 bist
+---
 
-# 2. Proje dizininde 'bist' ortamını aktif et (.python-version oluşturur)
-pyenv local bist
+## ☁️ GitHub Actions Kurulumu
 
-# 3. Paketleri yükle
-pip install --upgrade pip
-pip install -r requirements.txt
+GitHub deponuzda **Settings** -> **Secrets and variables** -> **Actions** menüsünden şu iki Secret'ı tanımlayın:
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
 
-# 4. Tarayıcıyı çalıştır
-python src/scanner.py morning_breakout
-python src/scanner.py evening_squeeze --dry-run
-```
+İş akışı hafta içi her gün otomatik çalışır veya **Telegram Mini App** içindeki **"🚀 Taramayı Şimdi Başlat"** butonuyla istediğiniz an tetiklenebilir.
