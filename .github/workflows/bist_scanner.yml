@@ -4,6 +4,7 @@ name: BIST Quant Scanner
   schedule:
     # Hafta içi her gün (Pazartesi-Cuma) Saat 10:16 TSİ (UTC 07:16) -> Sabah Kırılım & Tavan Adayları
     - cron: '16 7 * * 1-5'
+    - cron: '1,6,11,16,21 8 * * 1-5'
     # Hafta içi her gün (Pazartesi-Cuma) Saat 18:21 TSİ (UTC 15:21) -> Akşam Kapanış Sıkışmaları
     - cron: '21 15 * * 1-5'
 
@@ -56,8 +57,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             export SCAN_MODE="${{ github.event.inputs.scan_mode }}"
-          elif [ "${{ github.event.schedule }}" = "16 7 * * 1-5" ]; then
-            export SCAN_MODE="morning_breakout"
+          elif [ "${{ github.event.schedule }}" = "56 6 * * 1-5" ] || [ "${{ github.event.schedule }}" = "1,6,11,16,21 8 * * 1-5" ]; then 
+          export SCAN_MODE="morning_breakout"
           elif [ "${{ github.event.schedule }}" = "21 15 * * 1-5" ]; then
             export SCAN_MODE="evening_squeeze"
           else
